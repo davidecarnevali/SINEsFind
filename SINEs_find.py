@@ -12,9 +12,9 @@ from Bio.Emboss.Applications import NeedleCommandline
 from pybedtools import BedTool
 
 parser = argparse.ArgumentParser(
-    description = 'This script takes a coverage file in BAM or BEDGRAPH format and a SINE annotation file in GTF\
-    format to find genuine SINE transcripts. Version 2.1.6 July 2016',
-    epilog = 'Written by Davide Carnevali davide.carnevali@nemo.unipr.it')
+    description = 'This script takes in a RNA-Seq coverage file in BAM or BIGWIG format and a SINE annotation file in GTF\
+    format to find genuine Pol III-derived SINE transcripts. Version 2.1.6 July 2016',
+    epilog = 'Written by Davide Carnevali davide.carnevali@unipr.it')
 parser.add_argument("-s", "--stranded",
                     help="Use this option if using a stranded coverage file(s). If using bam file make sure it is\
                     generated with TopHat as this program use the 'XS' tag to identify the strand of the transcript\
@@ -34,7 +34,7 @@ parser.add_argument("-RR", "--right_region", type=int, help="Set the region size
 parser.add_argument("-OR", "--out_region", type=int, help="Set the region size in nt. Default: 100", default='100')
 parser.add_argument("coverage",
                     help="Coverage file to be processed, either in BAM or BigWig format. Using BigWig files the script run much faster (x10). If using BigWig make sure the coverage is made up only of uniquely mapped reads")
-parser.add_argument("gtf", help="annotation file in GFF/GTF format")
+parser.add_argument("gtf", help="annotation file in GTF format")
 parser.add_argument("genome", help="reference genome in fasta format")
 parser.add_argument("output", help="output filename")
 args = parser.parse_args()
