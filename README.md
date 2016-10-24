@@ -1,6 +1,2 @@
 # SINEsFind
-Requirements:
-HTSeq
-EMBOSS
-pybedtools
-pyBigWig
+Requirements: HTSeq, EMBOSS, pybedtools, pyBigWig
