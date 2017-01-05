@@ -1,3 +1,4 @@
+import resource
 import HTSeq
 import pyBigWig
 import argparse
@@ -46,6 +47,8 @@ MIRc = 'CGAGGCAGTGTGGTGCAGTGGAAAGAGCACTGGACTTGGAGTCAGGAAGACCTGGGTTCGAGTCCTGGCTCT
 MIR3 = 'TTCTGGAAGCAGTATGGTATAGTGGAAAGAACAACTGGACTAGGAGTCAGGAGACCTGGGTTCTAGTCCTAGCTCTGCCACTAACTAGCTGTGTGACCTTGGGCAAGTCACTTCACCTCTCTGGGCCTCAGTTTTCCTCATCTGTAAAATGAGNGGGTTGGACTAGATGATCTCTAAGGTCCCTTCCAGCTCTAACATTCTATGATTCTATGATTCTAAAAAAA'
 ALU = 'GGCCGGGCGCGGTGGCTCACGCCTGTAATCCCAGCACTTTGGGAGGCCGAGGCGGGAGGATTGCTTGAGCCCAGGAGTTCGAGACCAGCCTGGGCAACATAGCGAGACCCCGTCTCTACAAAAAATACAAAAATTAGCCGGGCGTGGTGGCGCGCGCCTGTAGTCCCAGCTACTCGGGAGGCTGAGGCAGGAGGATCGCTTGAGCCCAGGAGTTCGAGGCTGCAGTGAGCTATGATCGCGCCACTGCACTCCAGCCTGGGCGACAGAGCGAGACCCTGTCTCA'
 
+memLimit= 7 * 1024 * 1024 * 1024
+resource.setrlimit(resource.RLIMIT_AS, (memLimit, memLimit))
 start_time = time.time()
 annotation = HTSeq.GFF_Reader(args.gtf)
 cvg_plus = HTSeq.GenomicArray("auto", stranded=False, typecode="i")
@@ -59,7 +62,7 @@ count_minus = 0
 count = 0
 alu_list = []
 char = re.compile('-*')
-char2 = re.compile('[-ATGC]*')
+char2 = re.compile('[-NATGC]*')
 
 
 # Build the coverage vectors for + and - strand based on XS tag, using uniquely mapped reads
@@ -68,7 +71,7 @@ def cvg_bam(file):
     global count_plus
     global count_minus
     for read in file:
-        if read.aligned and read.optional_field('NH') == 1:
+        if read.aligned and not read.failed_platform_qc and read.optional_field('NH') == 1:
             if read.optional_field('XS') == '+':
                 for cigopt in read.cigar:
                     if cigopt.type == 'M':
@@ -85,7 +88,7 @@ def cvg_bam(file):
 def cvg_bam_unstranded(file):
     global count
     for read in file:
-        if read.aligned and read.optional_field('NH') == 1:
+        if read.aligned and not read.failed_platform_qc and read.optional_field('NH') == 1:
             for cigopt in read.cigar:
                 if cigopt.type == 'M':
                     cvg[cigopt.ref_iv] += 1
