@@ -6,10 +6,13 @@ import pandas as pd
 import os
 
 parser = argparse.ArgumentParser(
-    description = 'This script takes in an annotation file of human Alu and MIR elements and the corresponding human reference genome sequence\
-    to produce the index for SINEs_find.py. The index file is the annotation input file with added columns reporting the lenght, start and end of the alignment\
-    of the element sequence to its consensus sequence on the reference genome',
-    epilog = 'Written by Davide Carnevali davide.carnevali@unipr.it')
+    description = 'This script takes in an annotation file of human Alu and\
+        MIR elements and the corresponding human reference genome sequence\
+    to produce the index for SINEs_find.py. The index file is the annotation \
+        input file with added columns reporting the lenght, start and end of \
+            the alignment of the element sequence to its consensus sequence \
+                on the reference genome',
+    epilog = 'Written by Davide Carnevali davide.carnevali@crg.eu')
 parser.add_argument("annotation", help="Annotation file in GTF format. Should be the same version of the human reference genome file")
 parser.add_argument("genome", help="Human reference genome sequence. Should be the same version of the annotation file")
 parser.add_argument("output", help="output filename")
