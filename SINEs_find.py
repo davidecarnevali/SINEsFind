@@ -1,58 +1,66 @@
 from __future__ import division
-import resource
 import HTSeq
 import pyBigWig
 import numpy as np
 import argparse
 import csv
-import re
-import subprocess
-import sys
-import os
 import time
-import warnings
-from Bio import AlignIO
-from Bio.Emboss.Applications import NeedleCommandline
-from pybedtools import BedTool
-import psutil
+
 #from memory_profiler import profile
 import math
 
 parser = argparse.ArgumentParser(
-    description = 'This script takes in a RNA-Seq coverage file in BAM or BIGWIG format and a SINE annotation file in GTF\
-    format to find genuine Pol III-derived SINE transcripts. Version 2.3 February 2018',
-    epilog = 'Written by Davide Carnevali davide.carnevali@unipr.it')
-parser.add_argument("-g", "--ref_genome", choices=['GRCh38', 'GRCh37'], help = "Set the reference genome you are working on. Default is GRCh38", default='GRCh38')
+    description = 'This script takes in a RNA-Seq coverage file in BAM or \
+        BIGWIG format and a SINE annotation file in GTF extended\
+            format to find genuine Pol III-derived SINE transcripts.\
+                Version 2.4 December 2021',
+    epilog = 'Written by Davide Carnevali davide.carnevali@crg.eu')
+parser.add_argument("-g", "--ref_genome", choices=['GRCh38', 'GRCh37'],
+                    help = "Set the reference genome you are working on.\
+                        Default is GRCh38", default='GRCh38')
 parser.add_argument("-s", "--stranded", choices=['auto', 'no', 'yes', 'reverse'],
-                    help="Use this option if using a stranded coverage file(s). For first-strand synthesis use 'reverse' while for second-strand synthesis use 'yes'", default = 'auto')
+                    help="Use this option if using a stranded coverage file(s).\
+                        For first-strand synthesis use 'reverse' while for\
+                            second-strand synthesis use 'yes'", default = 'auto')
 parser.add_argument("-t", "--filetype", choices=['bam', 'bw'],
-                    help="specify coverage file type: default 'bam'. Bamfile should be sorted by coordinate. BigWig stranded files should be comma separated, with plus signal preceding the minus one",
+                    help="specify coverage file type: default 'bam'. Bamfile\
+                        should be sorted by coordinate. BigWig stranded files\
+                            should be comma separated, with plus signal\
+                                preceding the minus one",
                     default='bam')
 parser.add_argument("-bg", "--background", type=int,
-                    help="Set how many times the SINE area coverage should be greater than background . Default: 1",
-                    default='1')
-parser.add_argument("-lr", "--lratio", type=float, help="The ratio  left/central coverage area. Default: 0.1", default='0.1')
-parser.add_argument("-or", "--oratio", type=float, help="The ratio  out/central coverage area. Default 0.1", default='0.1')
-parser.add_argument("-TSS", "--tss", type=int, help="Set the width of Transcription Start Site. Default: 15",
-                    default='15')
-parser.add_argument("-LR", "--left_region", type=int, help="Set the region size in nt. Default: 100", default='100')
-parser.add_argument("-RR", "--right_region", type=int, help="Set the region size in nt. Default: 200", default='200')
-parser.add_argument("-OR", "--out_region", type=int, help="Set the region size in nt. Default: 100", default='100')
-parser.add_argument("-f", "--fraction", type=float, help="Fraction of the central body that should have an expression coverage over the background. Default 50%", default='0.5')
+                    help="Set how many times the SINE coverage area should be\
+                        greater than background . Default: 1",
+                    default=1)
+parser.add_argument("-lr", "--lratio", type=float, help="The ratio  left/central\
+                    coverage area. Default: 0.1", default=0.1)
+parser.add_argument("-or", "--oratio", type=float, help="The ratio  out/central\
+                    coverage area. Default 0.1", default=0.1)
+parser.add_argument("-TSS", "--tss", type=int, help="Set the width of \
+                    Transcription Start Site. Default: 15",
+                    default=15)
+parser.add_argument("-LR", "--left_region", type=int, help="Set the region \
+                    size in nt. Default: 100", default=100)
+parser.add_argument("-RR", "--right_region", type=int, help="Set the region \
+                    size in nt. Default: 300", default=300)
+parser.add_argument("-OR", "--out_region", type=int, help="Set the region size\
+                    in nt. Default: 100", default=100)
+parser.add_argument("-f", "--fraction", type=float, help="Fraction of the \
+                    SINE central part that should have an expression coverage\
+                        '-bg' times over the background. Default 50 per cent",
+                        default=0.5)
 parser.add_argument("coverage",
-                    help="Coverage file to be processed, either in BAM or BigWig format. Using BigWig files the script run much faster (x10). If using BigWig make sure the coverage is made up only of uniquely mapped reads")
-parser.add_argument("gtf", help="annotation file in GTF format")
-parser.add_argument("genome", help="reference genome in fasta format")
-parser.add_argument("chroms", help="chromosomes length used for mapping (as in bam header)")
+                    help="Coverage file to be processed, either in BAM or\
+                        BigWig format. Using BigWig files the script run much\
+                            faster (x10). If using BigWig make sure the coverage\
+                                is made up only of uniquely mapped reads")
+parser.add_argument("gtf", help="The extended annotation file generate using\
+                    AnnoGenerate.py")
+parser.add_argument("chroms", help="chromosomes length used for mapping\
+                    (as in bam header)")
 parser.add_argument("output", help="output filename")
 args = parser.parse_args()
 
-genome = BedTool(args.genome)
-MIR = 'ACAGTATAGCATAGTGGTTAAGAGCACGGACTCTGGAGCCAGACTGCCTGGGTTCGAATCCCGGCTCTGCCACTTACTAGCTGTGTGACCTTGGGCAAGTTACTTAACCTCTCTGTGCCTCAGTTTCCTCATCTGTAAAATGGGGATAATAATAGTACCTACCTCATAGGGTTGTTGTGAGGATTAAATGAGTTAATACATGTAAAGCGCTTAGAACAGTGCCTGGCACATAGTAAGCGCTCAATAAATGTTGGTTATTA'
-MIRb = 'CAGAGGGGCAGCGTGGTGCAGTGGAAAGAGCACGGGCTTTGGAGTCAGGCAGACCTGGGTTCGAATCCTGGCTCTGCCACTTACTAGCTGTGTGACCTTGGGCAAGTCACTTAACCTCTCTGAGCCTCAGTTTCCTCATCTGTAAAATGGGGATAATAATACCTACCTCGCAGGGTTGTTGTGAGGATTAAATGAGATAATGCATGTAAAGCGCTTAGCACAGTGCCTGGCACACAGTAAGCGCTCAATAAATGGTAGCTCTATTATT'
-MIRc = 'CGAGGCAGTGTGGTGCAGTGGAAAGAGCACTGGACTTGGAGTCAGGAAGACCTGGGTTCGAGTCCTGGCTCTGCCACTTACTAGCTGTGTGACCTTGGGCAAGTCACTTAACCTCTCTGAGCCTCAGTTTCCTCATCTGTAAAATGGGGATAATAATACCTGCCCTGCCTACCTCACAGGGTTGTTGTGAGGATCAAATGAGATAATGTATGTGAAAGCGCTTTGTAAACTGTAAAGTGCTATACAAATGTAAGGGGTTATTATTATT'
-MIR3 = 'TTCTGGAAGCAGTATGGTATAGTGGAAAGAACAACTGGACTAGGAGTCAGGAGACCTGGGTTCTAGTCCTAGCTCTGCCACTAACTAGCTGTGTGACCTTGGGCAAGTCACTTCACCTCTCTGGGCCTCAGTTTTCCTCATCTGTAAAATGAGNGGGTTGGACTAGATGATCTCTAAGGTCCCTTCCAGCTCTAACATTCTATGATTCTATGATTCTAAAAAAA'
-ALU = 'GGCCGGGCGCGGTGGCTCACGCCTGTAATCCCAGCACTTTGGGAGGCCGAGGCGGGAGGATTGCTTGAGCCCAGGAGTTCGAGACCAGCCTGGGCAACATAGCGAGACCCCGTCTCTACAAAAAATACAAAAATTAGCCGGGCGTGGTGGCGCGCGCCTGTAGTCCCAGCTACTCGGGAGGCTGAGGCAGGAGGATCGCTTGAGCCCAGGAGTTCGAGGCTGCAGTGAGCTATGATCGCGCCACTGCACTCCAGCCTGGGCGACAGAGCGAGACCCTGTCTCA'
 
 #memLimit= 8 * 1024 * 1024 * 1024
 #resource.setrlimit(resource.RLIMIT_AS, (memLimit, memLimit))
@@ -64,8 +72,6 @@ if args.ref_genome == "GRCh38":
     test_region = "chr12:6537505-6538052"
 elif args.ref_genome == "GRCh37":
     test_region = "chr12:6646671-6647218"
-char = re.compile('-*')
-char2 = re.compile('[-NATGC]*')
 annotation = [line.strip().split("\t") for line in open(args.gtf, "r")]
 for i in annotation:
     i[8] = i[8].strip().split("\"")[3]
@@ -75,7 +81,7 @@ with open(args.chroms) as f:
         (key, val) = line.split()
         if "_" not in key and "chr" in key and "EBV" not in key:
             chrom_list[key] = int(val)
-chromosomes = list(chrom_list.iteritems())
+chromosomes = list(chrom_list.items())
 chromosomes.sort()
 if args.filetype == 'bw':
     if args.stranded == 'reverse' or args.stranded == 'yes':
@@ -148,11 +154,11 @@ def cvg_bam(file):
         cvg_minus.write_bedgraph_file(bedgraphFile_minus)
         peak_plus = int(math.ceil(count_plus / p.pos))
         peak_minus = int(math.ceil(count_minus / p.pos))
-        print "Time elapsed for coverage calculation of chromosome " + p.chrom +" %s" % (time.time() - run_time) + " seconds"
+        print("Time elapsed for coverage calculation of chromosome {}: {} seconds".format(p.chrom, time.time() - run_time))
         cvg_time = time.time()
-        print "Start applying Flanking Region Filter for Alus on chromosome " + p.chrom
+        print("Start applying Flanking Region Filter for Alus on chromosome ".format(p.chrom))
         frf_stranded_bam(annotation, peak_plus, peak_minus, p.chrom)
-        print "Time elapsed for Pol III Alus discovery on chromosome " + p.chrom +" %s" % (time.time() - cvg_time) + " seconds"
+        print("Time elapsed for Pol III Alus discovery on chromosome {}: {} seconds".format(p.chrom, time.time() - cvg_time))
         run_time = time.time()
 
 
@@ -178,11 +184,11 @@ def cvg_bam_unstranded(file):
                             count += cigopt.ref_iv.length
         cvg.write_bedgraph_file(bedgraphFile)
         peak = int(math.ceil(count / p.pos))
-        print "Time elapsed for coverage calculation of chromosome " +  p.chrom +" %s" % (time.time() - run_time) + " seconds"
+        print("Time elapsed for coverage calculation of chromosome {}: {} seconds".format(p.chrom, time.time() - run_time))
         cvg_time = time.time()
-        print "Start applying Flanking Region Filter for Alus on chromosome " + p.chrom
-        frf_unstranded_bam(annotation,peak, p.chrom)
-        print "Time elapsed for Pol III Alus discovery on chromosome " + p.chrom +" %s" % (time.time() - cvg_time) + " seconds"
+        print("Start applying Flanking Region Filter for Alus on chromosome ".format(p.chrom))
+        frf_stranded_bam(annotation, peak_plus, peak_minus, p.chrom)
+        print("Time elapsed for Pol III Alus discovery on chromosome {}: {} seconds".format(p.chrom, time.time() - cvg_time))
         run_time = time.time()
 
 
@@ -370,68 +376,23 @@ def frf_unstranded_bam(gtf, peak, chr):
 
         else:
             continue
-def needle(chrom, start, end, name, score, strand):
-    n = 0
-    item=BedTool([(chrom, start, end, name, score, strand)])
-    item = item.sequence(fi=genome, s=True)
-    temp = open(item.seqfn).read().split('\n')[1]
-    if name == "MIRb":
-        needle_cline = NeedleCommandline(asequence="asis:"+MIRb, bsequence="asis:"+temp,gapopen=10, gapextend=0.5, outfile='stdout')
-        child = subprocess.Popen(str(needle_cline), stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=(sys.platform!="win32"))
-        child.wait()
-        align = AlignIO.read(child.stdout, "emboss")
-        aln_start = char.search(str(align[1, :].seq)).end()
-        aln_end = char2.search(str(align[1, :].seq)).end()
 
-    elif name == "MIRc":
-        needle_cline = NeedleCommandline(asequence="asis:"+MIRc, bsequence="asis:"+temp,gapopen=10, gapextend=0.5, outfile='stdout')
-        child = subprocess.Popen(str(needle_cline), stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=(sys.platform!="win32"))
-        child.wait()
-        align = AlignIO.read(child.stdout, "emboss")
-        aln_start = char.search(str(align[1, :].seq)).end()
-        aln_end = char2.search(str(align[1, :].seq)).end()
-
-    elif name == "MIR3":
-        needle_cline = NeedleCommandline(asequence="asis:"+MIR3, bsequence="asis:"+temp,gapopen=10, gapextend=0.5, outfile='stdout')
-        child = subprocess.Popen(str(needle_cline), stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=(sys.platform!="win32"))
-        child.wait()
-        align = AlignIO.read(child.stdout, "emboss")
-        aln_start = char.search(str(align[1, :].seq)).end()
-        aln_end = char2.search(str(align[1, :].seq)).end()
-
-    elif name == "MIR":
-        needle_cline = NeedleCommandline(asequence="asis:"+MIR, bsequence="asis:"+temp,gapopen=10, gapextend=0.5, outfile='stdout')
-        child = subprocess.Popen(str(needle_cline), stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=(sys.platform!="win32"))
-        child.wait()
-        align = AlignIO.read(child.stdout, "emboss")
-        aln_start = char.search(str(align[1, :].seq)).end()
-        aln_end = char2.search(str(align[1, :].seq)).end()
-
-    elif "Alu" in name:
-        needle_cline = NeedleCommandline(asequence="asis:"+ALU, bsequence="asis:"+temp,gapopen=10, gapextend=0.5, outfile='stdout')
-        child = subprocess.Popen(str(needle_cline), stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=(sys.platform!="win32"))
-        child.wait()
-        align = AlignIO.read(child.stdout, "emboss")
-        aln_start = char.search(str(align[1, :].seq)).end()
-        aln_end = char2.search(str(align[1, :].seq)).end()
-
-    return (aln_start, aln_end)
 
 #@profile
 def main():
     if args.filetype == 'bam':
         bamfile = HTSeq.BAM_Reader(args.coverage)
         if bamfile.get_header_dict()['HD']['SO'] != 'coordinate':
-            print "BAM file must be sorted by position. Exiting...."
+            print("BAM file must be sorted by position. Exiting....")
             raise SystemExit
         else:
             if args.stranded == 'auto':
                 strdchk(bamfile)
             if args.stranded == 'reverse' or args.stranded == 'yes':
-                print "Strandedness: " + args.stranded
+                print("Strandedness: {}".format(args.stranded))
                 cvg_bam(bamfile)
             elif args.stranded == 'no':
-                print "Strandedness: " + args.stranded
+                print("Strandedness: {}".format(args.stranded))
                 cvg_bam_unstranded(bamfile)
 
     elif args.filetype == 'bw':
@@ -439,31 +400,31 @@ def main():
             for chrom in chromosomes:
                 peak_plus = int(math.ceil(bw_plus.stats(chrom[0])[0]))
                 peak_minus = int(math.ceil(bw_minus.stats(chrom[0])[0]))
-                print "Start applying Flanking Region Filter for chromosome %s" %chrom[0]
+                print("Start applying Flanking Region Filter for chromosome {}".format(chrom[0]))
                 frf_stranded(annotation, peak_plus, peak_minus, chrom[0])
-                print "Time elapsed %s" % (time.time() - start_time)
+                print("Time elapsed {}".format((time.time() - start_time)))
         elif args.stranded == 'no':
             for chrom in chromosomes:
                 peak = int(math.ceil(bw.stats(chrom[0])[0]))
-                print "Start applying Flanking Region Filter for chromosome %s" %chrom[0]
+                print("Start applying Flanking Region Filter for chromosome {}".format(chrom[0]))
                 frf_unstranded(annotation, peak, chrom[0])
-                print "Time elapsed %s" % (time.time() - start_time)
+                print("Time elapsed {}".format((time.time() - start_time)))
 
     # Write to output the Bona Fide SINEs
 
-    with open(args.output, 'wb') as f:
+    with open(args.output, 'w') as f:
         writer = csv.writer(f, delimiter='\t')
         writer.writerows(alu_list)
 
     logfile.append(["Running parameters:","-g", args.ref_genome, "-s ", args.stranded, "-t ",args.filetype, "-bg",args.background, "-TSS", args.tss, "-LR",args.left_region, "-RR" ,args.right_region, "-OR ",args.out_region, "-lr", args.lratio, "-or",args.oratio, "-f", args.fraction])
-    logfile.append(["Annotation file:", args.gtf, args.genome])
-    with open(args.output + ".log", 'wb') as f:
+    logfile.append(["Annotation file:", args.gtf])
+    with open(args.output + ".log", 'w') as f:
         writer = csv.writer(f, delimiter='\t')
         writer.writerows(logfile)
 
-    print "Finished!"
-    print "Total Time elapsed %s" % (time.time() - start_time)
-    print "Number of SINEs over background %s" % count_sine
+    print("Finished!")
+    print("Total Time elapsed {}".format((time.time() - start_time)))
+    print("Number of SINEs over background {}".format(count_sine))
 # TODO GDC commands
 
 if __name__ == '__main__':
