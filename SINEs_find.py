@@ -2,9 +2,12 @@ from __future__ import division
 import HTSeq
 import pyBigWig
 import numpy as np
+import pandas as pd
 import argparse
 import csv
 import time
+import gzip
+import os
 
 #from memory_profiler import profile
 import math
@@ -19,7 +22,7 @@ parser.add_argument("-g", "--ref_genome", choices=['GRCh38', 'GRCh37'],
                     help = "Set the reference genome you are working on.\
                         Default is GRCh38", default='GRCh38')
 parser.add_argument("-s", "--stranded", choices=['auto', 'no', 'yes', 'reverse'],
-                    help="Use this option if using a stranded coverage file(s).\
+                    required=True, help="Use this option if using a stranded coverage file(s).\
                         For first-strand synthesis use 'reverse' while for\
                             second-strand synthesis use 'yes'", default = 'auto')
 parser.add_argument("-t", "--filetype", choices=['bam', 'bw'],
@@ -35,7 +38,7 @@ parser.add_argument("-bg", "--background", type=int,
 parser.add_argument("-lr", "--lratio", type=float, help="The ratio  left/central\
                     coverage area. Default: 0.1", default=0.1)
 parser.add_argument("-or", "--oratio", type=float, help="The ratio  out/central\
-                    coverage area. Default 0.1", default=0.1)
+                    coverage area. Default 0.1", default=0.2)
 parser.add_argument("-TSS", "--tss", type=int, help="Set the width of \
                     Transcription Start Site. Default: 15",
                     default=15)
@@ -65,16 +68,23 @@ args = parser.parse_args()
 #memLimit= 8 * 1024 * 1024 * 1024
 #resource.setrlimit(resource.RLIMIT_AS, (memLimit, memLimit))
 start_time = time.time()
-count_sine = 0
-alu_list = []
 logfile = []
+alu_list=[]
+count_sine = 0
+
 if args.ref_genome == "GRCh38":
     test_region = "chr12:6537505-6538052"
 elif args.ref_genome == "GRCh37":
     test_region = "chr12:6646671-6647218"
-annotation = [line.strip().split("\t") for line in open(args.gtf, "r")]
+
+filename, file_extension = os.path.splitext(args.gtf)
+if file_extension == '.gz' or file_extension == '.z' or file_extension == '.Z' or file_extension == '.zip':
+    annotation = [line.strip().split("\t") for line in gzip.open(args.gtf, mode='rt')]
+else :
+    annotation = [line.strip().split("\t") for line in open(args.gtf, 'r')]
 for i in annotation:
     i[8] = i[8].strip().split("\"")[3]
+
 chrom_list ={}
 with open(args.chroms) as f:
     for line in f:
@@ -83,22 +93,30 @@ with open(args.chroms) as f:
             chrom_list[key] = int(val)
 chromosomes = list(chrom_list.items())
 chromosomes.sort()
+
 if args.filetype == 'bw':
-    if args.stranded == 'reverse' or args.stranded == 'yes':
+    if args.stranded == 'reverse' or args.stranded == 'yes' or \
+        len(args.coverage.strip().splitt(","))>1:
         bw_plus = pyBigWig.open(args.coverage.strip().split(",")[0])
         bw_minus = pyBigWig.open(args.coverage.strip().split(",")[1])
     elif args.stranded == 'no':
         bw = pyBigWig.open(args.coverage)
-# Build the coverage vectors for + and - strand based on XS tag, using uniquely mapped reads
+
 def strdchk(file):
+    """ Check if the library is forward or reverse (dUTP method) stranded or 
+    unstranded """
+    
     firststrand = 0
     secondstrand = 0
     total = 0
     for read in file.fetch( region = test_region ):
-        if read.proper_pair and read.aligned and not read.failed_platform_qc and read.optional_field('NH') == 1:
-            if (read.pe_which == 'second' and read.iv.strand == '+') or (read.pe_which == 'first' and read.iv.strand == '-'):
+        if read.proper_pair and read.aligned and \
+            not read.failed_platform_qc and read.optional_field('NH') == 1:
+            if (read.pe_which == 'second' and read.iv.strand == '+') or \
+                (read.pe_which == 'first' and read.iv.strand == '-'):
                 firststrand += 1
-            elif (read.pe_which == 'second' and read.iv.strand == '-') or (read.pe_which == 'first' and read.iv.strand == '+'):
+            elif (read.pe_which == 'second' and read.iv.strand == '-') or \
+                (read.pe_which == 'first' and read.iv.strand == '+'):
                 secondstrand += 1
             total += 1
     if firststrand/total >= 0.8:
@@ -108,44 +126,53 @@ def strdchk(file):
     else:
         args.stranded = 'no'
 
+
 def cvg_bam(file):
+    """ This function builds the expression coverage vectors for + and - strands
+    for each chromosome using ungapped uniquely mapped reads based on the NH sam flag """
+    
     bedgraphFile_plus = open(args.output+"_plus.bg", 'w')
     bedgraphFile_minus = open(args.output+"_minus.bg", 'w')
-    global cvg_plus
-    global cvg_minus
-    global chromosomes
     run_time = time.time()
+    
     for interval in chromosomes:
         count_plus = 0
         count_minus = 0
         p = HTSeq.GenomicPosition( interval[0], interval[1], "." )
         window = HTSeq.GenomicInterval(p.chrom, 1, p.pos, ".")
-        cvg_plus = HTSeq.GenomicArray({p.chrom: p.pos}, stranded=False, typecode="i")
-        cvg_minus = HTSeq.GenomicArray({p.chrom: p.pos}, stranded=False, typecode="i")
+        cvg_plus = HTSeq.GenomicArray({p.chrom: p.pos}, stranded=False, 
+                                      typecode="i")
+        cvg_minus = HTSeq.GenomicArray({p.chrom: p.pos}, stranded=False, 
+                                       typecode="i")
         for read in file[window]:
-            if read.proper_pair and read.aligned and not read.failed_platform_qc and read.optional_field('NH') == 1:
+            if read.proper_pair and read.aligned and not \
+                read.failed_platform_qc and read.optional_field('NH') == 1:
                 cig_list = []
                 for x in read.cigar:
                     cig_list.append(x.type)
                 if 'N' not in cig_list:
                     if args.stranded == 'reverse':
-                        if (read.pe_which == 'second' and read.iv.strand == '+') or (read.pe_which == 'first' and read.iv.strand == '-'):
+                        if (read.pe_which == 'second' and read.iv.strand == '+') or \
+                            (read.pe_which == 'first' and read.iv.strand == '-'):
                             for cigopt in read.cigar:
                                 if cigopt.type == 'M':
                                     cvg_plus[cigopt.ref_iv] += 1
                                     count_plus += cigopt.ref_iv.length
-                        elif (read.pe_which == 'second' and read.iv.strand == '-') or (read.pe_which == 'first' and read.iv.strand == '+'):
+                        elif (read.pe_which == 'second' and read.iv.strand == '-') or \
+                            (read.pe_which == 'first' and read.iv.strand == '+'):
                             for cigopt in read.cigar:
                                 if cigopt.type == 'M':
                                     cvg_minus[cigopt.ref_iv] += 1
                                     count_minus += cigopt.ref_iv.length
                     elif args.stranded == 'yes':
-                        if (read.pe_which == 'first' and read.iv.strand == '+') or (read.pe_which == 'second' and read.iv.strand == '-'):
+                        if (read.pe_which == 'first' and read.iv.strand == '+') or \
+                            (read.pe_which == 'second' and read.iv.strand == '-'):
                             for cigopt in read.cigar:
                                 if cigopt.type == 'M':
                                     cvg_plus[cigopt.ref_iv] += 1
                                     count_plus += cigopt.ref_iv.length
-                        elif (read.pe_which == 'first' and read.iv.strand == '-') or (read.pe_which == 'second' and read.iv.strand == '+'):
+                        elif (read.pe_which == 'first' and read.iv.strand == '-') or \
+                            (read.pe_which == 'second' and read.iv.strand == '+'):
                             for cigopt in read.cigar:
                                 if cigopt.type == 'M':
                                     cvg_minus[cigopt.ref_iv] += 1
@@ -154,26 +181,34 @@ def cvg_bam(file):
         cvg_minus.write_bedgraph_file(bedgraphFile_minus)
         peak_plus = int(math.ceil(count_plus / p.pos))
         peak_minus = int(math.ceil(count_minus / p.pos))
-        print("Time elapsed for coverage calculation of chromosome {}: {} seconds".format(p.chrom, time.time() - run_time))
+        print("Time elapsed for coverage calculation of chromosome {}: {} \
+              seconds".format(p.chrom, time.time() - run_time))
         cvg_time = time.time()
-        print("Start applying Flanking Region Filter for Alus on chromosome ".format(p.chrom))
-        frf_stranded_bam(annotation, peak_plus, peak_minus, p.chrom)
-        print("Time elapsed for Pol III Alus discovery on chromosome {}: {} seconds".format(p.chrom, time.time() - cvg_time))
+        print("Start applying Flanking Region Filter for Alus on chromosome \
+              {}".format(p.chrom))
+        frf_stranded_bam(annotation, peak_plus, peak_minus, cvg_plus, 
+                         cvg_minus, p.chrom)
+
+        print("Time elapsed for Pol III Alus discovery on chromosome {}: {} \
+              seconds".format(p.chrom, time.time() - cvg_time))
         run_time = time.time()
 
 
 def cvg_bam_unstranded(file):
+    """ This function builds the unstranded expression coverage vector 
+    for each chromosome using ungapped uniquely mapped reads based on the NH sam flag """
+    
     bedgraphFile = open(args.output+".bg", 'w')
-    global cvg
-    global chromosomes
     run_time = time.time()
+
     for interval in chromosomes:
         count = 0
         p = HTSeq.GenomicPosition( interval[0], interval[1], "." )
         window = HTSeq.GenomicInterval(p.chrom, 1, p.pos, ".")
         cvg = HTSeq.GenomicArray({p.chrom: p.pos}, stranded=False, typecode="i")
         for read in file[window]:
-            if read.proper_pair and read.aligned and not read.failed_platform_qc and read.optional_field('NH') == 1:
+            if read.proper_pair and read.aligned and not \
+                read.failed_platform_qc and read.optional_field('NH') == 1:
                 cig_list = []
                 for x in read.cigar:
                     cig_list.append(x.type)
@@ -184,26 +219,32 @@ def cvg_bam_unstranded(file):
                             count += cigopt.ref_iv.length
         cvg.write_bedgraph_file(bedgraphFile)
         peak = int(math.ceil(count / p.pos))
-        print("Time elapsed for coverage calculation of chromosome {}: {} seconds".format(p.chrom, time.time() - run_time))
+        print("Time elapsed for coverage calculation of chromosome {}: {} \
+              seconds".format(p.chrom, time.time() - run_time))
         cvg_time = time.time()
-        print("Start applying Flanking Region Filter for Alus on chromosome ".format(p.chrom))
-        frf_stranded_bam(annotation, peak_plus, peak_minus, p.chrom)
-        print("Time elapsed for Pol III Alus discovery on chromosome {}: {} seconds".format(p.chrom, time.time() - cvg_time))
+        print("Start applying Flanking Region Filter for Alus on chromosome \
+              {}".format(p.chrom))
+        frf_unstranded_bam(annotation, peak, p.chrom)
+        print("Time elapsed for Pol III Alus discovery on chromosome {}: {} \
+              seconds".format(p.chrom, time.time() - cvg_time))
         run_time = time.time()
+        
 
-
-# Calculate coverage in the Left/Center/Right arm of the SINEs
 
 def frf_stranded(gtf, peak_plus, peak_minus, chr):
-    global alu_list
+    """ This function it uses the bigWig expression coverage vectors to filter out 
+    'passenger Alus' and retain only putative PolIII-transcribed Alu RNAs """
+  
     global count_sine
+    
     for element in gtf:
         if element[0] == chr:
             if element[6] == '+':
-                if sum(bw_plus.values(element[0], int(element[3]),int(element[4]))) > args.background * ((int(element[4]) - int(element[3])) * peak_plus):
-                    count_sine += 1
+                if sum(bw_plus.values(element[0], int(element[3]),int(element[4]))) \
+                    > args.background * ((int(element[4]) - int(element[3])) \
+                                         * peak_plus):
                     if "MIR" in element[8] or "Alu" in element[8]:
-                        central = int(sum(np.nan_to_num(bw_plus.values(element[0], int(element[9]),int(element[10])))))
+                        central = int(sum(np.nan_to_num(bw_plus.values(element[0],int(element[9]),int(element[10])))))
                         right = int(sum(np.nan_to_num(bw_plus.values(element[0],int(element[10]), int(element[10]) + args.right_region))))
                         left = int(sum(np.nan_to_num(bw_plus.values(element[0], int(element[9]) - args.tss - args.left_region, int(element[9]) - args.tss))))
                         out = int(sum(np.nan_to_num(bw_plus.values(element[0], int(element[10]) + args.right_region, int(element[10]) + args.right_region + args.out_region))))
@@ -213,7 +254,6 @@ def frf_stranded(gtf, peak_plus, peak_minus, chr):
                     continue
             elif element[6] == '-':
                 if sum(bw_minus.values(element[0], int(element[3]),int(element[4]))) > args.background * ((int(element[4]) - int(element[3])) * peak_minus):
-                    count_sine += 1
                     if "MIR" in element[8] or "Alu" in element[8]:
                         central = int(sum(np.nan_to_num(bw_minus.values(element[0],int(element[9]),int(element[10])))))
                         right = int(sum(np.nan_to_num(bw_minus.values(element[0], int(element[9]) - args.right_region,int(element[9])))))
@@ -239,16 +279,20 @@ def frf_stranded(gtf, peak_plus, peak_minus, chr):
                             percentage = bases_over_bg / body_length
                     start += 1
                 if percentage >= args.fraction:
-                    alu_list.append([element[8], element[0], int(element[3]),int(element[4]), element[6], left, central, right, out,peak_plus, peak_minus, percentage])
+                    alu_list.append([element[8], element[0], int(element[3]),int(element[4]), element[6], left, central, right, out,peak_plus, peak_minus])
+                    count_sine += 1
         else:
             continue
 
-def frf_unstranded(gtf, peak, chr):
+
+def frf_unstranded(gtf, peak, cvg, chr):
+    """ This function it uses the bigWig unstranded expression coverage vector
+    to filter out 'passenger Alus' and retain only putative PolIII-transcribed Alu RNAs """
+
     global count_sine
     for element in gtf:
         if element[0] == chr:
             if sum(bw.values(element[0], int(element[3]),int(element[4]))) > args.background * ((int(element[4]) - int(element[3])) * peak):
-                count_sine += 1
                 if "MIR" in element[8] or "Alu" in element[8]:
                     if element[6] == '+':
                         central = int(sum(bw.values(element[0], int(element[9]),int(element[10]))))
@@ -271,22 +315,29 @@ def frf_unstranded(gtf, peak, chr):
                                 percentage = bases_over_bg / body_length
                             start += 1
                         if percentage >= args.fraction:
-                            alu_list.append([element[8], element[0], int(element[3]),int(element[4]), element[6], left, central, right, out, peak, percentage])
+                            alu_list.append([element[8], element[0], int(element[3]),int(element[4]), element[6], left, central, right, out, peak])
+                            count_sine += 1
                 else:
                     continue
             else:
                 continue
         else:
                 continue
+    
 
-def frf_stranded_bam(gtf, peak_plus, peak_minus, chr):
+def frf_stranded_bam(gtf, peak_plus, peak_minus, cvg_plus, cvg_minus, chr):
+    """ This function it uses the stranded expression coverage vectors calculated from
+    the bam file to filter out 'passenger Alus' and retain only putative 
+    PolIII-transcribed Alu RNAs """
+    
     global count_sine
+    
     for element in gtf:
         if element[0] == chr:
             if element[6] == '+':
-                if sum(list(cvg_plus[HTSeq.GenomicInterval(element[0], int(element[3]),int(element[4]))])) > args.background * (
-                            (int(element[4]) - int(element[3])) * peak_plus):
-                    count_sine += 1
+                if sum(list(cvg_plus[HTSeq.GenomicInterval(element[0], 
+                                                           int(element[3]),
+                                                           int(element[4]))])) > args.background * ((int(element[4]) - int(element[3])) * peak_plus):
                     if "MIR" in element[8] or "Alu" in element[8]:
                         central = int(sum(list(cvg_plus[HTSeq.GenomicInterval(element[0],int(element[9]),int(element[10]))])))
                         right = int(sum(list(cvg_plus[HTSeq.GenomicInterval(element[0],int(element[10]), int(element[10]) + args.right_region)])))
@@ -299,7 +350,6 @@ def frf_stranded_bam(gtf, peak_plus, peak_minus, chr):
             elif element[6] == '-':
                 if sum(list(cvg_minus[HTSeq.GenomicInterval(element[0], int(element[3]),int(element[4]))])) > args.background * (
                             (int(element[4]) - int(element[3])) * peak_minus):
-                    count_sine += 1
                     if "MIR" in element[8] or "Alu" in element[8]:
                         central = int(sum(list(cvg_minus[HTSeq.GenomicInterval(element[0],int(element[9]),int(element[10]))])))
                         right = int(sum(list(cvg_minus[HTSeq.GenomicInterval(element[0], int(element[9]) - args.right_region,int(element[9]))])))
@@ -326,19 +376,23 @@ def frf_stranded_bam(gtf, peak_plus, peak_minus, chr):
                             percentage = bases_over_bg / body_length
                     start += 1
                 if percentage >= args.fraction:
-                    alu_list.append([element[8], element[0], int(element[3]),int(element[4]), element[6], left, central, right, out, peak_plus, peak_minus,percentage])
-
+                    alu_list.append([element[8], element[0], int(element[3]),int(element[4]), element[6], left, central, right, out, peak_plus, peak_minus])
+                    count_sine += 1
         else:
             continue
-
-def frf_unstranded_bam(gtf, peak, chr):
+    
+def frf_unstranded_bam(gtf, peak, cvg, chr):
+    """ This function it uses the unstranded expression coverage vector calculated from
+    the bam file to filter out 'passenger Alus' and retain only putative 
+    PolIII-transcribed Alu RNAs """
+    
     global count_sine
+    
     for element in gtf:
         if element[0] == chr:
             if element[6] == '+':
                 if sum(list(cvg[HTSeq.GenomicInterval(element[0], int(element[3]),int(element[4]))])) > args.background * (
                             (int(element[4]) - int(element[3])) * peak):
-                    count_sine += 1
                     if "MIR" in element[8] or "Alu" in element[8]:
                         central = int(sum(list(cvg[HTSeq.GenomicInterval(element[0],int(element[9]),int(element[10]))])))
                         right = int(sum(list(cvg[HTSeq.GenomicInterval(element[0],int(element[10]), int(element[10]) + args.right_region)])))
@@ -350,7 +404,6 @@ def frf_unstranded_bam(gtf, peak, chr):
                     continue
             elif element[6] == '-':
                 if sum(list(cvg[HTSeq.GenomicInterval(element[0], int(element[3]),int(element[4]))])) > args.background * ((int(element[4]) - int(element[3])) * peak):
-                    count_sine += 1
                     if "MIR" in element[8] or "Alu" in element[8]:
                         central = int(sum(list(cvg[HTSeq.GenomicInterval(element[0], int(element[9]), int(element[10]))])))
                         right = int(sum(list(cvg[HTSeq.GenomicInterval(element[0], int(element[9]) - args.right_region,int(element[9]))])))
@@ -372,13 +425,12 @@ def frf_unstranded_bam(gtf, peak, chr):
                         percentage = bases_over_bg / body_length
                     start += 1
                 if percentage >= args.fraction:
-                    alu_list.append([element[8], element[0], int(element[3]),int(element[4]), element[6], left, central, right, out, peak, percentage])
-
+                    alu_list.append([element[8], element[0], int(element[3]),int(element[4]), element[6], left, central, right, out, peak])
+                    count_sine += 1
         else:
             continue
+    
 
-
-#@profile
 def main():
     if args.filetype == 'bam':
         bamfile = HTSeq.BAM_Reader(args.coverage)
@@ -411,11 +463,20 @@ def main():
                 print("Time elapsed {}".format((time.time() - start_time)))
 
     # Write to output the Bona Fide SINEs
-
-    with open(args.output, 'w') as f:
-        writer = csv.writer(f, delimiter='\t')
-        writer.writerows(alu_list)
-
+    
+    if args.stranded == 'reverse' or args.stranded == 'yes':
+        df = pd.DataFrame(alu_list, columns=['Name','chrom', 'start','end', 
+                                         'strand', 'left_cvg', 'central_cvg', 
+                                         'right_cvg', 'out_cvg', 'peak_plus',
+                                         'peak_minus'])
+        df.to_csv(args.output, sep="\t", index=False)
+    
+    else:
+        df = pd.DataFrame(alu_list, columns=['Name','chrom', 'start','end', 
+                                         'strand', 'left_cvg', 'central_cvg', 
+                                         'right_cvg', 'out_cvg', 'peak'])
+        df.to_csv(args.output, sep="\t", index=False)
+    
     logfile.append(["Running parameters:","-g", args.ref_genome, "-s ", args.stranded, "-t ",args.filetype, "-bg",args.background, "-TSS", args.tss, "-LR",args.left_region, "-RR" ,args.right_region, "-OR ",args.out_region, "-lr", args.lratio, "-or",args.oratio, "-f", args.fraction])
     logfile.append(["Annotation file:", args.gtf])
     with open(args.output + ".log", 'w') as f:
@@ -424,8 +485,8 @@ def main():
 
     print("Finished!")
     print("Total Time elapsed {}".format((time.time() - start_time)))
-    print("Number of SINEs over background {}".format(count_sine))
-# TODO GDC commands
+    print("Number of SINEs that passed the filters {}".format(count_sine))
+
 
 if __name__ == '__main__':
     main()
