@@ -57,7 +57,7 @@ parser.add_argument("coverage",
                         BigWig format. Using BigWig files the script run much\
                             faster (x10). If using BigWig make sure the coverage\
                                 is made up only of uniquely mapped reads")
-parser.add_argument("gtf", help="The extended annotation file generate using\
+parser.add_argument("gtf", help="The extended gtf annotation file generate using\
                     AnnoGenerate.py")
 parser.add_argument("chroms", help="chromosomes length used for mapping\
                     (as in bam header)")
