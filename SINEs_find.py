@@ -22,9 +22,10 @@ parser.add_argument("-g", "--ref_genome", choices=['GRCh38', 'GRCh37'],
                     help = "Set the reference genome you are working on.\
                         Default is GRCh38", default='GRCh38')
 parser.add_argument("-s", "--stranded", choices=['auto', 'no', 'yes', 'reverse'],
-                    required=True, help="Use this option if using a stranded coverage file(s).\
-                        For first-strand synthesis use 'reverse' while for\
-                            second-strand synthesis use 'yes'", default = 'auto')
+                    required=True, help="Use this option if using a stranded \
+                        coverage file(s). For first-strand library use \
+                            'reverse' while for second-strand library use 'yes'",
+                            default = 'auto')
 parser.add_argument("-t", "--filetype", choices=['bam', 'bw'],
                     help="specify coverage file type: default 'bam'. Bamfile\
                         should be sorted by coordinate. BigWig stranded files\
@@ -103,7 +104,7 @@ if args.filetype == 'bw':
         bw = pyBigWig.open(args.coverage)
 
 def strdchk(file):
-    """ Check if the library is forward or reverse (dUTP method) stranded or 
+    """ Check if the library is first (dUTP method) or second strand or 
     unstranded """
     
     firststrand = 0
