@@ -18,6 +18,7 @@ be taken into account. A bioinformatic pipeline has been recently set up that,
 by exploiting RNA-seq features and knowledge of SINE transcription mechanisms, 
 allows for easy identification and profiling of transcriptionally active genomic
 
+#### How it works
 SINEsFind allows to detect free SINE RNAs by using paired-end RNA-Seq data.
 It works by comparing the expression coverage upstream and downstream the 
 annotad human SINE element (Alus and Mammalian-wide Interpsersed Repeats)
