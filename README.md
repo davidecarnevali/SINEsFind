@@ -69,7 +69,7 @@ regions and the SINE element
 - How many times the SINE expression coverage area should be greater than the calculated background  
 
 Please, run SINEs_find -h to view the **Help** and discover all available
-parameters
+parameters and their default values, which are suitable for most of the cases.
 
 #### Output
 The output file of the SINEs_find tool contains the name and the genomic
