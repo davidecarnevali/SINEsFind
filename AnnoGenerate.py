@@ -107,9 +107,9 @@ def needle(chrom, start, end, name, score, strand):
 for element in annotation:
     aln_start, aln_end, sine_length = needle(element.iv.chrom, element.iv.start, element.iv.end, element.attr['gene_id'], int(element.score), element.iv.strand)
     if element.iv.strand == "+":
-        alu_list.append([element.iv.chrom, element.source, "exon", element.iv.start + 1, element.iv.end, "0", element.iv.strand, ".", "gene_id " + "\""+element.attr['transcript_id']+"\"; " + "transcript_id " + "\""+element.attr['transcript_id']+"\";",element.iv.start - aln_start, (element.iv.start - aln_start) + aln_end, aln_start, aln_end])
+        alu_list.append([element.iv.chrom, element.source, "exon", element.iv.start + 1, element.iv.end, "0", element.iv.strand, ".", "gene_id " + "\""+element.attr['transcript_id']+"\"; " + "transcript_id " + "\""+element.attr['transcript_id']+"\";",element.iv.start - aln_start, (element.iv.start - aln_start) + aln_end])
     else:
-        alu_list.append([element.iv.chrom, element.source, "exon", element.iv.start + 1, element.iv.end, "0", element.iv.strand, ".", "gene_id " + "\""+element.attr['transcript_id']+"\"; " + "transcript_id " + "\""+element.attr['transcript_id']+"\";",(element.iv.end + aln_start) - aln_end, element.iv.end + aln_start, aln_start, aln_end])
+        alu_list.append([element.iv.chrom, element.source, "exon", element.iv.start + 1, element.iv.end, "0", element.iv.strand, ".", "gene_id " + "\""+element.attr['transcript_id']+"\"; " + "transcript_id " + "\""+element.attr['transcript_id']+"\";",(element.iv.end + aln_start) - aln_end, element.iv.end + aln_start])
 
 final_list = pd.DataFrame(alu_list)
 final_list.to_csv(args.output,sep="\t", header=False,index=False,doublequote=False,quotechar='\'',escapechar='')
