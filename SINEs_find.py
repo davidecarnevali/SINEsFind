@@ -103,6 +103,20 @@ if args.filetype == 'bw':
     elif args.stranded == 'no':
         bw = pyBigWig.open(args.coverage)
 
+def pairedchk(file):
+    """ Check if the alignment arise from paire-end sequencing """
+    readsnum=0
+    for read in file.fetch(region = test_region):
+        if read.paired_end:
+            print("Working with paired-end reads: proceeding...")
+            break
+        else:
+            readsnum+=1
+            if readsnum>50:
+                print("This does not seem to be a paired-end alignment...")
+                raise SystemExit
+            
+    
 def strdchk(file):
     """ Check if the library is first (dUTP method) or second strand or 
     unstranded """
@@ -110,7 +124,7 @@ def strdchk(file):
     firststrand = 0
     secondstrand = 0
     total = 0
-    for read in file.fetch( region = test_region ):
+    for read in file.fetch(region = test_region):
         if read.proper_pair and read.aligned and \
             not read.failed_platform_qc and read.optional_field('NH') == 1:
             if (read.pe_which == 'second' and read.iv.strand == '+') or \
@@ -435,6 +449,7 @@ def frf_unstranded_bam(gtf, peak, cvg, chr):
 def main():
     if args.filetype == 'bam':
         bamfile = HTSeq.BAM_Reader(args.coverage)
+        pairedchk(bamfile)
         if bamfile.get_header_dict()['HD']['SO'] != 'coordinate':
             print("BAM file must be sorted by position. Exiting....")
             raise SystemExit
