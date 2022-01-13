@@ -1,9 +1,8 @@
-import HTSeq, sys, time, argparse, warnings, csv, re, subprocess
+import HTSeq, sys, time, argparse, re, subprocess
 from Bio.Emboss.Applications import NeedleCommandline
 from Bio import AlignIO
 from pybedtools import BedTool
 import pandas as pd
-import os
 
 parser = argparse.ArgumentParser(
     description = 'This script takes in an annotation file of human Alu and\
@@ -41,7 +40,6 @@ char2 = re.compile('[-NATGCatgc]*')
     
 def needle(chrom, start, end, name, score, strand):
     tmpfile = open("tmpaln.txt", 'w')
-    n = 0
     item=BedTool([(chrom, start, end, name, score, strand)])
     item = item.sequence(fi=genome, s=True)
     temp = open(item.seqfn).read().split('\n')[1]
