@@ -58,7 +58,7 @@ Gencode version 24.
  **Example**: python AnnoGenerate.py *alus.gtf.gz* *hg38.fa* *outputname*
 
 2. Once the extended annotation index has been created, we can run SINEsFind as
-follow using BAM file as input and using default parameters:  
+in the following example which uses BAM file as input and default parameters:  
 python SINEs_find.py -s auto -t bam *bamfile* *annotation_file* *chrom_sizes* *output_file*  
 
 SINEs_find has several optional parameters that can be adjusted to user's need
