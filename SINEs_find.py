@@ -15,7 +15,8 @@ import math
 parser = argparse.ArgumentParser(
     description = 'This script takes in a RNA-Seq coverage file in BAM or \
         BIGWIG format and a SINE annotation file in GTF extended\
-            format to find genuine Pol III-derived SINE transcripts.\
+            format generated with AnnoGenerae.py to find genuine \
+                Pol III-derived SINE transcripts.\
                 Version 2.4 December 2021',
     epilog = 'Written by Davide Carnevali davide.carnevali@crg.eu')
 parser.add_argument("-g", "--ref_genome", choices=['GRCh38', 'GRCh37'],
@@ -60,8 +61,8 @@ parser.add_argument("coverage",
                                 is made up only of uniquely mapped reads")
 parser.add_argument("gtf", help="The extended gtf annotation file generate using\
                     AnnoGenerate.py")
-parser.add_argument("chroms", help="chromosomes length used for mapping\
-                    (as in bam header)")
+parser.add_argument("chroms", help="File containing the chromosomes length used\
+                    for mapping (as in bam header)")
 parser.add_argument("output", help="output filename")
 args = parser.parse_args()
 
