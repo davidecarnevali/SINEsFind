@@ -49,9 +49,9 @@ more faster (10x).
 using the **AnnoGenerate.py** script which calculate the genomic coordinates of
 the **expected full-lenght** SINE element (see more in the reference paper below).  
 It expects the following positional arguments:  
-`- annotation: Annotation file in GTF format (either gzipped or not). Should refer to the same version of the human reference genome sequence`  
-`- genome: Human reference genome sequence. Should refer to the same version of the annotation file`  
-`- output: The output filename`
+- **annotation**: Annotation file in GTF format (either gzipped or not). Should refer to the same version of the human reference genome sequence  
+- **genome**: Human reference genome sequence. Should refer to the same version of the annotation file  
+- **output**: The output filename
 
  **Example**: `python AnnoGenerate.py annotation.gtf.gz hg38.fa outputname`  
 
