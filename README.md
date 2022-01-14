@@ -56,11 +56,11 @@ pre-computed extended annotation file for Alu elements in GRCh38 reference genom
 that do not overlap, in the same orientation, any of the genes annotated in
 Gencode version 24.  
 
- **Example**: python AnnoGenerate.py *alus.gtf.gz* *hg38.fa* *outputname*
+ **Example**: `python AnnoGenerate.py *alus.gtf.gz* *hg38.fa* *outputname*`
 
 2. Once the extended annotation index has been created, we can run SINEsFind as
 in the following example which uses BAM file as input and default parameters:  
-python SINEs_find.py -s auto -t bam *bamfile* *annotation_file* *chrom_sizes* *output_file*  
+`python SINEs_find.py -s auto -t bam *bamfile* *annotation_file* *chrom_sizes* *output_file*``  
 
 SINEs_find has several optional parameters that can be adjusted to user's need
 such as:
@@ -69,7 +69,7 @@ regions and the SINE element
 - The length of the upstream/downstream regions
 - How many times the SINE expression coverage area should be greater than the calculated background  
 
-Please, run SINEs_find -h to view the **Help** and discover all available
+Please, run `SINEs_find -h` to view the **Help** and discover all available
 parameters and their default values, which are suitable for most of the cases.
 
 #### Output
