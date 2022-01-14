@@ -1,4 +1,17 @@
-import HTSeq, sys, time, argparse, re, subprocess
+import pkg_resources
+import sys
+import subprocess
+
+required = {'HTSeq', 'Bio', 'pybedtools', 'pandas'}
+installed = {pkg.key for pkg in pkg_resources.working_set}
+missing = required - installed
+
+if missing:
+    print("Installing missing packages with pip .....")
+    python = sys.executable
+    subprocess.check_call([python, '-m', 'pip', 'install', *missing])
+    
+import HTSeq, time, argparse, re
 from Bio.Emboss.Applications import NeedleCommandline
 from Bio import AlignIO
 from pybedtools import BedTool
