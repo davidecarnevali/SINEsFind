@@ -48,19 +48,23 @@ more faster (10x).
 1. The first step is to build an index of the SINEs annotation by
 using the **AnnoGenerate.py** script which calculate the genomic coordinates of
 the **expected full-lenght** SINE element (see more in the reference paper below).  
-It expects as input the annotation file containing the SINEs of interest (Alu/MIR)
-in GTF format (either gzipped or not) and the fasta sequence of the human
-reference genome. The output file will cill be the input GTF annotation file with additional 2 columns corresponding to the calculated start/end genomic coordinates
-of the expected full-length element. The annotation folder contains already the
-pre-computed extended annotation file for Alu elements in GRCh38 reference genome
-that do not overlap, in the same orientation, any of the genes annotated in
-Gencode version 24.  
+It expects the following positional arguments:  
+`- annotation: Annotation file in GTF format (either gzipped or not). Should refer to the same version of the human reference genome sequence`  
+`- genome: Human reference genome sequence. Should refer to the same version of the annotation file`  
+`- output: The output filename`
 
- **Example**: `python AnnoGenerate.py *alus.gtf.gz* *hg38.fa* *outputname*`
+ **Example**: `python AnnoGenerate.py annotation.gtf.gz hg38.fa outputname`  
+
+ The **output file index** will be the input GTF annotation file with additional 2 columns corresponding to the calculated start/end genomic coordinates
+ of the expected full-length element. The annotation folder contains already the
+ pre-computed extended annotation file for Alu elements in GRCh38 reference genome
+ that do not overlap, in the same orientation, any of the genes annotated in
+ Gencode version 24.  
 
 2. Once the extended annotation index has been created, we can run SINEsFind as
 in the following example which uses BAM file as input and default parameters:  
-`python SINEs_find.py -s auto -t bam *bamfile* *annotation_file* *chrom_sizes* *output_file*``  
+
+ `python SINEs_find.py -s auto -t bam bamfile ./annotations/alu_intergenic_gencode24.gtf.gz chrom_sizes output_file`  
 
 SINEs_find has several optional parameters that can be adjusted to user's need
 such as:
