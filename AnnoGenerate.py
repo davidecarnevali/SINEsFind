@@ -14,8 +14,9 @@ parser = argparse.ArgumentParser(
             the alignment of the element sequence to its consensus sequence \
                 on the reference genome',
     epilog = 'Written by Davide Carnevali davide.carnevali@crg.eu')
-parser.add_argument("annotation", help="Annotation file in GTF format. Should \
-                    refer to the same version of the human reference genome file")
+parser.add_argument("annotation", help="Annotation file in GTF format \
+                    (either gzipped or not). Should refer to the same version \
+                        of the human reference genome file")
 parser.add_argument("genome", help="Human reference genome sequence. Should refer \
                     to the same version of the annotation file")
 parser.add_argument("output", help="output filename")
