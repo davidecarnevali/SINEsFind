@@ -19,14 +19,15 @@ be taken into account. A bioinformatic pipeline has been recently set up that,
 by exploiting RNA-seq features and knowledge of SINE transcription mechanisms,
 allows for easy identification and profiling of transcriptionally active genomic
 
-![image](./img/realVSpassenger.png)
 #### How it works
 SINEsFind allows to detect free SINE RNAs by using paired-end RNA-Seq data.
 It works by comparing the level of the expression coverage onto the SINE element
-with those upstream and downstream of it to it. In this way SINEs_Find is able to distinguish a free PolIII-transcribed SINE RNA from one that is passenger of
+with those upstream and downstream of it to it to check for enrichment. In this way SINEs_Find is able to distinguish a free PolIII-transcribed SINE RNA from one that is passenger of
 longer PolII transcript.
-For a complete description of the tool, check the reserach paper [here](https://www.mdpi.com/2311-553X/3/1/15)
 
+![image](./img/realVSpassenger.png)
+
+For a complete description of the method, check the research paper [here](https://www.mdpi.com/2311-553X/3/1/15)
 #### Requirements:
 SINEs_find works with Python version 3.x and needs the following packages to be
 installed:
@@ -39,8 +40,8 @@ installed:
  - Numpy
 
 #### Usage
-SINEsFind works with paired-end RNA-Seq data, both stranded or not, however to
-exploit its potential it is **recommended** to use paired-end stranded reads at
+SINEsFind works with **paired-end RNA-Seq data**, both stranded or not, but to
+exploit its potential it is **recommended** to use paired-end **stranded** reads at
 least 75 nt long. It works both with bam or bigwig files, the latter being much
 more faster (10x).
 
