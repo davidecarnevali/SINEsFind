@@ -1,16 +1,5 @@
-import pkg_resources
 import sys
-import subprocess
-
-required = {'HTSeq', 'Bio', 'pybedtools', 'pandas'}
-installed = {pkg.key for pkg in pkg_resources.working_set}
-missing = required - installed
-
-if missing:
-    print("Installing missing packages with pip .....")
-    python = sys.executable
-    subprocess.check_call([python, '-m', 'pip', 'install', *missing])
-    
+import subprocess   
 import HTSeq, time, argparse, re
 from Bio.Emboss.Applications import NeedleCommandline
 from Bio import AlignIO
@@ -26,9 +15,9 @@ parser = argparse.ArgumentParser(
                 on the reference genome',
     epilog = 'Written by Davide Carnevali davide.carnevali@crg.eu')
 parser.add_argument("annotation", help="Annotation file in GTF format. Should \
-                    be the same version of the human reference genome file")
-parser.add_argument("genome", help="Human reference genome sequence. Should be \
-                    the same version of the annotation file")
+                    refer to the same version of the human reference genome file")
+parser.add_argument("genome", help="Human reference genome sequence. Should refer \
+                    to the same version of the annotation file")
 parser.add_argument("output", help="output filename")
 args = parser.parse_args()
 

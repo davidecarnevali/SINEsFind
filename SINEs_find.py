@@ -1,17 +1,4 @@
 from __future__ import division
-import pkg_resources
-import sys
-import subprocess
-
-required = {'HTSeq', 'Bio', 'pybedtools', 'pandas', 'numpy', 'pybigwig', 'csv'}
-installed = {pkg.key for pkg in pkg_resources.working_set}
-missing = required - installed
-
-if missing:
-    print("Installing missing packages with pip .....")
-    python = sys.executable
-    subprocess.check_call([python, '-m', 'pip', 'install', *missing])
-    
 import HTSeq
 import pyBigWig
 import numpy as np
