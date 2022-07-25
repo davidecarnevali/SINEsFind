@@ -40,7 +40,7 @@ parser.add_argument("-bg", "--background", type=int,
 parser.add_argument("-lr", "--lratio", type=float, help="The ratio  left/central\
                     coverage area. Default: 0.1", default=0.1)
 parser.add_argument("-or", "--oratio", type=float, help="The ratio  out/central\
-                    coverage area. Default 0.1", default=0.2)
+                    coverage area. Default 0.2", default=0.2)
 parser.add_argument("-TSS", "--tss", type=int, help="Set the width of \
                     Transcription Start Site. Default: 15",
                     default=15)
