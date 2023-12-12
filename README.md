@@ -1,6 +1,6 @@
 # SINEsFind
 
-**Author**: Davide Carnevali (davide.carnevali@crg.eu)
+**Author**: Davide Carnevali (hackingfactory@gmail.com)
 ### Abstract
 
 Short Interspersed Element (SINE) retrotransposons are one of the
